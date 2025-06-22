@@ -142,9 +142,26 @@ impl Local {
 
 ## Testing
 
+flurry::HashMap’s Drop implementation walks every bucket with an epoch::unprotected() guard and destructs each entry immediately.
+
 https://github.com/jonhoo/flurry/blob/c0a84ac093d73b69916ed873ca8a9119b08d177b/tests/basic.rs#L365-L381
 ```rust
+#[test]
+fn current_kv_dropped() {
+  let dropped1 = Arc::new(0);
+  let dropped2 = Arc::new(0);
 
+  let map = HashMap::<Arc<usize>, Arc<usize>>::new();
+  map.insert(dropped1.clone(), dropped2.clone(), &map.guard());
+  assert_eq!(Arc::strong_count(&dropped1), 2);
+  assert_eq!(Arc::strong_count(&dropped2), 2);
+
+  drop(map); // stdlib drop
+
+  // dropping the map should immediately drop (not deferred) all keys and values
+  assert_eq!(Arc::strong_count(&dropped1), 1);
+  assert_eq!(Arc::strong_count(&dropped2), 1);
+}
 ```
 
 ## Alternatives
